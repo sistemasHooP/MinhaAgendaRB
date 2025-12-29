@@ -11,11 +11,9 @@
         .btn-primary { background-color: #3b82f6; color: white; border-radius: 12px; transition: 0.2s; }
         .btn-primary:active { transform: scale(0.96); background-color: #2563eb; }
         
-        /* Animação Genérica */
         .btn-anim { transition: transform 0.15s ease; }
         .btn-anim:active { transform: scale(0.95); }
 
-        /* Spinner */
         .spinner {
             border: 2px solid rgba(255,255,255,0.3);
             border-radius: 50%;
@@ -49,14 +47,8 @@
         }
         .event-card:active { transform: scale(0.98); z-index: 20; }
         
-        /* STATUS VISUAIS */
-        /* Confirmado: Apenas borda verde forte, não muda o fundo para preservar cor do serviço */
         .status-confirmado { border: 2px solid #10b981 !important; border-left-width: 4px !important; }
-        
-        /* Concluido: Cinza, finalizado */
         .status-concluido { background-color: #f1f5f9 !important; border-left-color: #64748b !important; opacity: 0.8; color: #64748b !important; }
-        
-        /* Cancelado: Vermelho claro, riscado */
         .status-cancelado { background-color: #fef2f2 !important; border-left-color: #ef4444 !important; text-decoration: line-through; opacity: 0.6; color: #ef4444 !important; }
 
         .bottom-nav { position: fixed; bottom: 0; left: 0; width: 100%; background: white; border-top: 1px solid #e2e8f0; display: flex; justify-content: space-around; padding: 12px 0; z-index: 50; padding-bottom: max(12px, env(safe-area-inset-bottom)); }
@@ -213,6 +205,37 @@
             </form>
         </div>
     </div>
+    
+    <!-- MODAL EDITAR AGENDAMENTO -->
+    <div id="modal-editar-agendamento" class="modal-overlay">
+        <div class="modal-card">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-xl font-bold text-slate-800">Editar Horário</h3>
+                <button onclick="fecharModal('modal-editar-agendamento')"><i data-lucide="x" class="text-slate-400"></i></button>
+            </div>
+            <form id="form-editar-agendamento" onsubmit="salvarEdicaoAgendamento(event)">
+                <input type="hidden" id="edit-agenda-id">
+                <div class="space-y-4">
+                    <div>
+                        <p class="text-xs font-bold text-slate-400 uppercase mb-1">Cliente</p>
+                        <p id="edit-agenda-cliente" class="text-lg font-bold text-slate-800"></p>
+                        <p id="edit-agenda-servico" class="text-sm text-slate-500"></p>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 uppercase mb-1 ml-1">Nova Data</label>
+                            <input type="date" id="edit-agenda-data" name="nova_data" required class="w-full p-3 bg-slate-50 border rounded-xl outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 uppercase mb-1 ml-1">Novo Horário</label>
+                            <input type="time" id="edit-agenda-hora" name="novo_horario" required class="w-full p-3 bg-slate-50 border rounded-xl outline-none">
+                        </div>
+                    </div>
+                </div>
+                <button type="submit" id="btn-salvar-edicao-agenda" class="w-full mt-6 py-3 btn-primary font-bold btn-anim">Atualizar</button>
+            </form>
+        </div>
+    </div>
 
     <!-- MODAL VENDER PACOTE -->
     <div id="modal-vender-pacote" class="modal-overlay">
@@ -254,7 +277,8 @@
             <div class="flex justify-between items-center mb-4"><h3 class="text-lg font-bold">Detalhes</h3><button onclick="fecharModal('modal-detalhes')"><i data-lucide="x"></i></button></div>
             <div id="detalhes-conteudo" class="mb-4"></div>
             <div class="flex flex-col gap-3">
-                <button id="btn-confirmar" class="p-3 bg-blue-50 text-blue-700 font-bold rounded-xl text-sm border border-blue-100 flex items-center justify-center gap-2 btn-anim"><i data-lucide="thumbs-up" class="w-4 h-4"></i> Confirmar Presença</button>
+                <button onclick="abrirModalEditarAgendamento()" class="w-full py-3 bg-slate-100 text-slate-700 font-bold rounded-xl text-sm hover:bg-slate-200 btn-anim flex items-center justify-center gap-2"><i data-lucide="clock" class="w-4 h-4"></i> Editar Horário</button>
+                <button id="btn-confirmar" onclick="prepararStatus('Confirmado', this)" class="p-3 bg-blue-50 text-blue-700 font-bold rounded-xl text-sm border border-blue-100 flex items-center justify-center gap-2 btn-anim"><i data-lucide="thumbs-up" class="w-4 h-4"></i> Confirmar Presença</button>
                 <button onclick="prepararStatus('Concluido', this)" class="p-3 bg-slate-100 text-slate-600 font-bold rounded-xl text-sm flex items-center justify-center gap-2 btn-anim"><i data-lucide="check" class="w-4 h-4"></i> Concluir (Realizado)</button>
                 <div class="grid grid-cols-2 gap-2 mt-2">
                     <button onclick="prepararStatus('Cancelado', this)" class="p-3 bg-yellow-100 text-yellow-700 font-bold rounded-xl text-sm hover:bg-yellow-200 btn-anim">Cancelar</button>
@@ -288,22 +312,50 @@
                 <div class="space-y-4">
                     <input type="text" name="nome_servico" required placeholder="Nome do Serviço" class="w-full p-3 bg-slate-50 border rounded-xl outline-none">
                     <div class="grid grid-cols-2 gap-3"><input type="number" step="0.01" name="valor_unitario" placeholder="Preço" required class="w-full p-3 bg-slate-50 border rounded-xl outline-none"><input type="number" name="duracao_minutos" placeholder="Minutos" required value="60" class="w-full p-3 bg-slate-50 border rounded-xl outline-none"></div>
-                    
-                    <div>
-                        <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Imagem do Serviço</label>
-                        <input type="file" id="input-imagem-servico" accept="image/*" class="w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
-                    </div>
-
-                    <div>
-                        <label class="flex items-center gap-3 p-2 bg-slate-50 rounded-lg cursor-pointer">
-                            <input type="checkbox" id="check-online-booking" class="w-5 h-5 text-blue-600 rounded">
-                            <span class="text-sm font-bold text-slate-700">Permitir Agendamento Online</span>
-                        </label>
-                    </div>
-
+                    <div><label class="block text-xs font-bold text-slate-500 uppercase mb-1">Imagem do Serviço</label><input type="file" id="input-imagem-servico" accept="image/*" class="w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"></div>
+                    <div><label class="flex items-center gap-3 p-2 bg-slate-50 rounded-lg cursor-pointer"><input type="checkbox" id="check-online-booking" class="w-5 h-5 text-blue-600 rounded"><span class="text-sm font-bold text-slate-700">Permitir Agendamento Online</span></label></div>
                     <div><p class="text-xs font-bold text-slate-500 mb-2">Cor</p><div id="color-picker-container" class="flex justify-between"></div><input type="hidden" name="cor_hex" id="input-cor-selecionada" value="#3b82f6"></div>
                 </div>
                 <button type="submit" id="btn-salvar-servico" class="w-full mt-6 py-3 btn-primary font-bold btn-anim">Salvar</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL EDITAR SERVICO -->
+    <div id="modal-editar-servico" class="modal-overlay">
+        <div class="modal-card">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-xl font-bold text-slate-800">Editar Serviço</h3>
+                <button onclick="fecharModal('modal-editar-servico')"><i data-lucide="x" class="text-slate-400"></i></button>
+            </div>
+            <form id="form-editar-servico" onsubmit="salvarEdicaoServico(event)">
+                <input type="hidden" name="id_servico" id="edit-id-servico">
+                <div class="space-y-4">
+                    <input type="text" name="nome_servico" id="edit-nome-servico" required placeholder="Nome do Serviço" class="w-full p-3 bg-slate-50 border rounded-xl outline-none">
+                    <div class="grid grid-cols-2 gap-3">
+                        <input type="number" step="0.01" name="valor_unitario" id="edit-valor-servico" placeholder="Preço" required class="w-full p-3 bg-slate-50 border rounded-xl outline-none">
+                        <input type="number" name="duracao_minutos" id="edit-duracao-servico" placeholder="Minutos" required class="w-full p-3 bg-slate-50 border rounded-xl outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Nova Imagem (opcional)</label>
+                        <input type="file" id="edit-input-imagem-servico" accept="image/*" class="w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+                    </div>
+                    <div>
+                        <label class="flex items-center gap-3 p-2 bg-slate-50 rounded-lg cursor-pointer">
+                            <input type="checkbox" id="edit-check-online-booking" class="w-5 h-5 text-blue-600 rounded">
+                            <span class="text-sm font-bold text-slate-700">Permitir Agendamento Online</span>
+                        </label>
+                    </div>
+                    <div>
+                        <p class="text-xs font-bold text-slate-500 mb-2">Cor</p>
+                        <div id="edit-color-picker-container" class="flex justify-between"></div>
+                        <input type="hidden" name="cor_hex" id="edit-input-cor-selecionada">
+                    </div>
+                </div>
+                <div class="flex gap-3 mt-6">
+                    <button type="button" onclick="excluirServicoViaModal()" class="flex-1 py-3 text-red-600 font-bold hover:bg-red-50 rounded-xl btn-anim border border-red-200">Excluir</button>
+                    <button type="submit" id="btn-salvar-edicao-servico" class="flex-1 py-3 btn-primary font-bold btn-anim">Salvar Alterações</button>
+                </div>
             </form>
         </div>
     </div>
@@ -343,6 +395,7 @@
             testarConexao();
             carregarConfiguracoesAPI();
             renderizarColorPicker();
+            renderizarColorPickerEdicao();
         });
 
         // --- SISTEMA DE ALERTA E CONFIRMAÇÃO ---
@@ -361,7 +414,6 @@
             btnSim.innerText = textoSim;
             btnNao.innerText = textoNao;
             
-            // Clone para remover listeners anteriores
             const novoBtnSim = btnSim.cloneNode(true);
             const novoBtnNao = btnNao.cloneNode(true);
             
@@ -370,7 +422,6 @@
             
             novoBtnSim.onclick = () => {
                 setLoading(novoBtnSim, true, textoSim);
-                // Fecha modal no callback para evitar travamento visual imediato
                 const resultado = callbackSim(); 
             };
             
@@ -385,7 +436,7 @@
         function setLoading(btn, isLoading, text) {
             if (isLoading) {
                 btn.disabled = true;
-                btn.innerHTML = `<span class="spinner ${btn.classList.contains('bg-slate-100') || btn.classList.contains('text-slate-500') ? 'spinner-dark' : ''}"></span> ${text === 'Sim' ? 'Processando...' : 'Aguarde...'}`;
+                btn.innerHTML = `<span class="spinner ${btn.classList.contains('bg-slate-100') || btn.classList.contains('text-slate-500') || btn.classList.contains('text-red-600') ? 'spinner-dark' : ''}"></span> ${text === 'Sim' ? 'Processando...' : 'Aguarde...'}`;
             } else {
                 btn.disabled = false;
                 btn.innerHTML = text;
@@ -395,6 +446,7 @@
         // --- CORE FUNCTIONS ---
         function getCorServico(s) { if(!s) return '#3b82f6'; return s.cor_hex || s.cor || s.color || s.Cor || s['Cor Hex'] || '#3b82f6'; }
         function hexToRgba(hex, a) { if(!hex) return `rgba(59, 130, 246, ${a})`; hex = hex.replace('#',''); return `rgba(${parseInt(hex.substring(0,2),16)}, ${parseInt(hex.substring(2,4),16)}, ${parseInt(hex.substring(4,6),16)}, ${a})`; }
+        function hexToRgb(hex) { var result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex); return result ? parseInt(result[1], 16) + ", " + parseInt(result[2], 16) + ", " + parseInt(result[3], 16) : "59, 130, 246"; }
 
         async function carregarConfiguracoesAPI() {
             try {
@@ -481,9 +533,6 @@
             const id = document.getElementById('id-agendamento-ativo').value;
             const idPacote = document.getElementById('id-pacote-agendamento-ativo').value;
             
-            // Se o botão foi passado, usa para efeito de loading local
-            // Se for via modal de confirmação, btnEl é null
-            
             if (st === 'Excluir') {
                 mostrarConfirmacao(
                     'Apagar Agendamento', 
@@ -500,10 +549,8 @@
                     'Não, Debitar'
                 );
             } else if (st === 'Confirmado') {
-                 // Chama direto, mas passamos btnEl para animar
                  if(btnEl) {
                      setLoading(btnEl, true, btnEl.innerText);
-                     // Usa setTimeout para garantir que a UI atualize antes do fetch
                      setTimeout(() => executarMudancaStatus(id, st, false, btnEl), 10);
                  } else {
                      executarMudancaStatus(id, st, false, null);
@@ -517,7 +564,6 @@
             let originalText = '';
             if (btnEl) {
                 originalText = btnEl.innerHTML; 
-                // Já setamos loading no prepararStatus, mas garantimos aqui se vier direto
                 if(!btnEl.disabled) setLoading(btnEl, true, originalText.replace(/<[^>]*>/g, '').trim());
             }
 
@@ -531,11 +577,64 @@
                 if(devolver) setTimeout(carregarPacotes, 1500);
             } catch(e){ 
                 mostrarAviso('Erro ao atualizar status'); 
-                if(btnEl) setLoading(btnEl, false, originalText); // Restaura em caso de erro
+                if(btnEl) setLoading(btnEl, false, originalText); // Restaura se der erro
             } 
         }
 
-        // --- SERVIÇOS COM UPLOAD ---
+        // --- EDIÇÃO DE AGENDAMENTO (NOVO) ---
+        function abrirModalEditarAgendamento() {
+            const id = document.getElementById('id-agendamento-ativo').value;
+            const ag = agendamentosCache.find(a => a.id_agendamento === id);
+            if(!ag) return;
+
+            // Fecha modal detalhes
+            fecharModal('modal-detalhes');
+
+            // Preenche modal edição
+            document.getElementById('edit-agenda-id').value = id;
+            document.getElementById('edit-agenda-cliente').innerText = ag.nome_cliente || 'Cliente';
+            
+            const servico = servicosCache.find(s => String(s.id_servico) === String(ag.id_servico));
+            document.getElementById('edit-agenda-servico').innerText = servico ? servico.nome_servico : 'Serviço';
+            
+            document.getElementById('edit-agenda-data').value = ag.data_agendamento;
+            document.getElementById('edit-agenda-hora').value = ag.hora_inicio;
+
+            document.getElementById('modal-editar-agendamento').classList.add('open');
+        }
+
+        async function salvarEdicaoAgendamento(e) {
+            e.preventDefault();
+            const btn = document.getElementById('btn-salvar-edicao-agenda');
+            const originalText = btn.innerText;
+            setLoading(btn, true, originalText);
+            
+            const id = document.getElementById('edit-agenda-id').value;
+            const novaData = document.getElementById('edit-agenda-data').value;
+            const novoHorario = document.getElementById('edit-agenda-hora').value;
+
+            try {
+                await fetch(API_URL, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        action: 'updateAgendamentoDataHora',
+                        id_agendamento: id,
+                        data_agendamento: novaData,
+                        hora_inicio: novoHorario
+                    })
+                });
+                
+                fecharModal('modal-editar-agendamento');
+                carregarAgendamentosDoDia();
+                mostrarAviso('Agendamento atualizado!');
+            } catch(err) {
+                mostrarAviso('Erro ao atualizar.');
+            } finally {
+                setLoading(btn, false, originalText);
+            }
+        }
+
+        // --- SERVIÇOS (CRIAR E EDITAR) ---
         async function salvarNovoServico(e) { 
             e.preventDefault(); 
             const btn = document.getElementById('btn-salvar-servico'); 
@@ -575,6 +674,79 @@
             finally { setLoading(btn, false, originalText); } 
         }
 
+        function abrirModalEditarServico(id) {
+            const servico = servicosCache.find(s => s.id_servico === id);
+            if (!servico) return;
+
+            document.getElementById('edit-id-servico').value = servico.id_servico;
+            document.getElementById('edit-nome-servico').value = servico.nome_servico;
+            document.getElementById('edit-valor-servico').value = servico.valor_unitario;
+            document.getElementById('edit-duracao-servico').value = servico.duracao_minutos;
+            document.getElementById('edit-check-online-booking').checked = String(servico.agendamento_online) === 'true';
+            
+            const cor = getCorServico(servico);
+            document.getElementById('edit-input-cor-selecionada').value = cor;
+            
+            document.querySelectorAll('#edit-color-picker-container .color-option').forEach(el => {
+                if (el.style.backgroundColor === 'rgb(' + hexToRgb(cor) + ')') {
+                     el.classList.add('selected');
+                } else {
+                     el.classList.remove('selected');
+                }
+            });
+
+            document.getElementById('modal-editar-servico').classList.add('open');
+        }
+
+        async function salvarEdicaoServico(e) {
+            e.preventDefault();
+            const btn = document.getElementById('btn-salvar-edicao-servico');
+            const originalText = btn.innerText;
+            setLoading(btn, true, originalText);
+            const f = e.target;
+            const fileInput = document.getElementById('edit-input-imagem-servico');
+            let imagemUrl = ''; 
+
+            if (fileInput.files.length > 0) {
+                btn.innerHTML = '<span class="spinner"></span> Enviando img...';
+                try {
+                    const formData = new FormData();
+                    formData.append('image', fileInput.files[0]);
+                    const imgReq = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, { method: 'POST', body: formData });
+                    const imgRes = await imgReq.json();
+                    if (imgRes.success) { imagemUrl = imgRes.data.url; } 
+                } catch (err) { console.error(err); }
+            }
+
+            try {
+                await fetch(API_URL, {method:'POST', body:JSON.stringify({
+                    action: 'updateServico',
+                    id_servico: f.id_servico.value,
+                    nome_servico: f.nome_servico.value,
+                    valor_unitario: f.valor_unitario.value,
+                    duracao_minutos: f.duracao_minutos.value,
+                    cor_hex: f.cor_hex.value,
+                    online_booking: document.getElementById('edit-check-online-booking').checked,
+                    imagem_url: imagemUrl
+                })});
+                fecharModal('modal-editar-servico');
+                carregarServicos();
+            } catch(e) { mostrarAviso('Erro ao editar'); }
+            finally { setLoading(btn, false, originalText); }
+        }
+
+        function excluirServicoViaModal() {
+            const id = document.getElementById('edit-id-servico').value;
+            mostrarConfirmacao('Excluir Serviço', 'Tem certeza? Isso não apagará o histórico, apenas desativará o serviço.', async () => {
+                try {
+                    await fetch(API_URL, {method:'POST', body:JSON.stringify({action:'deleteServico', id_servico: id})});
+                    fecharModal('modal-confirmacao');
+                    fecharModal('modal-editar-servico');
+                    carregarServicos();
+                } catch(e) { mostrarAviso('Erro ao excluir'); }
+            });
+        }
+
         async function carregarServicos() { try{const r=await fetch(`${API_URL}?action=getServicos`); servicosCache=await r.json(); const datalist = document.getElementById('lista-servicos-datalist'); datalist.innerHTML = ''; servicosCache.forEach(i=>{const o=document.createElement('option');o.value=i.nome_servico; datalist.appendChild(o);}); renderizarListaServicos();} catch(e){}}
         
         function renderizarListaServicos() { 
@@ -586,8 +758,10 @@
                     ? `<img src="${s.imagem_url}" class="w-10 h-10 rounded-full object-cover border-2 border-white shadow-sm">` 
                     : `<div class="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold shadow-sm" style="background-color:${cor}">${s.nome_servico.charAt(0).toUpperCase()}</div>`;
                 
-                c.innerHTML+=`
-                    <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex justify-between items-center mb-2">
+                const div = document.createElement('div');
+                div.className = "bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex justify-between items-center mb-2 cursor-pointer hover:bg-slate-50 transition";
+                div.onclick = () => abrirModalEditarServico(s.id_servico);
+                div.innerHTML = `
                         <div class="flex items-center gap-3">
                             ${iconeHtml}
                             <div>
@@ -595,8 +769,11 @@
                                 <p class="text-xs text-slate-400">${s.duracao_minutos} min • R$${s.valor_unitario}</p>
                             </div>
                         </div>
-                    </div>`; 
+                        <i data-lucide="chevron-right" class="text-slate-300 w-5 h-5"></i>
+                    `; 
+                c.appendChild(div);
             }); 
+            lucide.createIcons();
         }
         
         async function carregarClientes() { try { const r=await fetch(`${API_URL}?action=getClientes`); clientesCache=await r.json(); atualizarDatalistClientes(); } catch(e){ console.error("Erro clientes", e); } }
@@ -639,14 +816,17 @@
 
             // LOGICA DE EXIBIÇÃO DO BOTAO
             if (ag.status === 'Confirmado') {
+                // Estado: JÁ CONFIRMADO (Desativado visualmente)
                 novoBtnConfirmar.innerHTML = '<i data-lucide="check-circle" class="w-4 h-4"></i> Já Confirmado';
                 novoBtnConfirmar.className = "p-3 bg-green-100 text-green-700 font-bold rounded-xl text-sm border border-green-200 flex items-center justify-center gap-2 cursor-default";
                 novoBtnConfirmar.onclick = null; 
                 novoBtnConfirmar.disabled = true;
                 novoBtnConfirmar.style.display = 'flex';
             } else if (['Concluido', 'Cancelado'].includes(ag.status)) {
+                // Esconde se já acabou
                 novoBtnConfirmar.style.display = 'none';
             } else {
+                // Pendente
                 novoBtnConfirmar.style.display = 'flex';
             }
 
@@ -695,6 +875,7 @@
         function mudarDia(d) { dataAtual.setDate(dataAtual.getDate()+d); atualizarPickerData(); carregarAgendamentosDoDia(); }
         function atualizarPickerData() { document.getElementById('data-picker').value = dataAtual.toISOString().split('T')[0]; document.getElementById('dia-semana-display').innerText = dataAtual.toLocaleDateString('pt-PT', {weekday:'long', day:'numeric', month:'long'}); }
         function renderizarColorPicker() { const c=document.getElementById('color-picker-container'); c.innerHTML=''; PALETA_CORES.forEach((cor,i)=>{const d=document.createElement('div');d.className=`color-option ${i===4?'selected':''}`;d.style.backgroundColor=cor;d.onclick=()=>{document.querySelectorAll('.color-option').forEach(el=>el.classList.remove('selected'));d.classList.add('selected');document.getElementById('input-cor-selecionada').value=cor};c.appendChild(d)})}
+        function renderizarColorPickerEdicao() { const c=document.getElementById('edit-color-picker-container'); c.innerHTML=''; PALETA_CORES.forEach((cor,i)=>{const d=document.createElement('div');d.className=`color-option ${i===4?'selected':''}`;d.style.backgroundColor=cor;d.onclick=()=>{document.querySelectorAll('#edit-color-picker-container .color-option').forEach(el=>el.classList.remove('selected'));d.classList.add('selected');document.getElementById('edit-input-cor-selecionada').value=cor};c.appendChild(d)})}
         async function testarConexao() { try{const r=await fetch(`${API_URL}?action=testConnection`);const d=await r.json();if(d.status==='sucesso')document.getElementById('connection-status').className='w-2.5 h-2.5 rounded-full bg-green-500'}catch(e){document.getElementById('connection-status').className='w-2.5 h-2.5 rounded-full bg-red-500'}}
         document.getElementById('data-picker').addEventListener('change', (e) => { const p=e.target.value.split('-'); dataAtual=new Date(p[0],p[1]-1,p[2]); atualizarPickerData(); carregarAgendamentosDoDia(); });
         function formatarDataBr(dataStr) { if(!dataStr) return ''; if(dataStr.includes('T')) return new Date(dataStr).toLocaleDateString('pt-BR'); return dataStr.split('-').reverse().join('/'); }
