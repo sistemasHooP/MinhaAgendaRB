@@ -1,0 +1,720 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minha Agenda Pro</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        body { background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; padding-bottom: 90px; color: #334155; -webkit-tap-highlight-color: transparent; }
+        .btn-primary { background-color: #3b82f6; color: white; border-radius: 12px; transition: 0.2s; }
+        .btn-primary:active { transform: scale(0.96); background-color: #2563eb; }
+        
+        /* Animação Genérica */
+        .btn-anim { transition: transform 0.15s ease; }
+        .btn-anim:active { transform: scale(0.95); }
+
+        /* Spinner */
+        .spinner {
+            border: 2px solid rgba(255,255,255,0.3);
+            border-radius: 50%;
+            border-top: 2px solid white;
+            width: 1em;
+            height: 1em;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+            vertical-align: middle;
+            margin-right: 0.5rem;
+        }
+        .spinner-dark { border-color: rgba(0,0,0,0.1); border-top-color: #334155; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 60; display: none; align-items: center; justify-content: center; backdrop-filter: blur(2px); }
+        .modal-overlay.open { display: flex; }
+        .modal-card { background: white; width: 90%; max-width: 400px; border-radius: 20px; padding: 24px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1); animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1); max-height: 90vh; overflow-y: auto; }
+        @keyframes slideUp { from { transform: translateY(50px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        
+        .time-slot { display: flex; border-bottom: 1px solid #f1f5f9; position: relative; }
+        .time-label { width: 60px; text-align: right; padding-right: 12px; color: #94a3b8; font-size: 0.8rem; font-weight: 500; flex-shrink: 0; transform: translateY(-50%); padding-top: 0; display: flex; align-items: center; justify-content: flex-end; height: 1px; }
+        .time-slot::before { content: ''; position: absolute; left: 60px; right: 0; top: 0; border-top: 1px dashed #e2e8f0; pointer-events: none; }
+        .slot-content { flex-grow: 1; position: relative; height: 100%; }
+        .slot-livre-area { width: 100%; height: 100%; cursor: pointer; }
+        .slot-livre-area:active { background-color: #f1f5f9; }
+
+        .event-card { 
+            position: absolute; border-radius: 6px; padding: 4px 6px; font-size: 0.75rem; 
+            cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.08); z-index: 10; border-left: 4px solid; 
+            overflow: hidden; line-height: 1.2; transition: transform 0.1s;
+        }
+        .event-card:active { transform: scale(0.98); z-index: 20; }
+        
+        /* STATUS VISUAIS */
+        /* Confirmado: Apenas borda verde forte, não muda o fundo para preservar cor do serviço */
+        .status-confirmado { border: 2px solid #10b981 !important; border-left-width: 4px !important; }
+        
+        /* Concluido: Cinza, finalizado */
+        .status-concluido { background-color: #f1f5f9 !important; border-left-color: #64748b !important; opacity: 0.8; color: #64748b !important; }
+        
+        /* Cancelado: Vermelho claro, riscado */
+        .status-cancelado { background-color: #fef2f2 !important; border-left-color: #ef4444 !important; text-decoration: line-through; opacity: 0.6; color: #ef4444 !important; }
+
+        .bottom-nav { position: fixed; bottom: 0; left: 0; width: 100%; background: white; border-top: 1px solid #e2e8f0; display: flex; justify-content: space-around; padding: 12px 0; z-index: 50; padding-bottom: max(12px, env(safe-area-inset-bottom)); }
+        .nav-item { display: flex; flex-direction: column; align-items: center; font-size: 0.7rem; color: #94a3b8; gap: 4px; cursor: pointer;}
+        .nav-item.active { color: #3b82f6; font-weight: 600; }
+        .tab-content { display: none; padding: 16px; max-width: 600px; margin: 0 auto; }
+        .tab-content.active { display: block; }
+        .fab { position: fixed; bottom: 85px; right: 20px; background-color: #3b82f6; color: white; width: 56px; height: 56px; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4); cursor: pointer; z-index: 40; }
+        .color-option { width: 30px; height: 30px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; }
+        .color-option.selected { border-color: #333; transform: scale(1.1); }
+
+        .modal-tabs { display: flex; border-bottom: 1px solid #e2e8f0; margin-bottom: 16px; }
+        .modal-tab { flex: 1; text-align: center; padding: 8px; font-size: 0.85rem; font-weight: 600; color: #94a3b8; cursor: pointer; }
+        .modal-tab.active { color: #3b82f6; border-bottom: 2px solid #3b82f6; }
+        .modal-tab-content { display: none; }
+        .modal-tab-content.active { display: block; }
+    </style>
+</head>
+<body>
+    <header class="bg-white px-5 py-4 shadow-sm sticky top-0 z-20 flex justify-between items-center">
+        <h1 class="text-xl font-bold text-slate-800 flex items-center gap-2 tracking-tight">
+            <i data-lucide="calendar-days" class="w-6 h-6 text-blue-600"></i> Minha Agenda
+        </h1>
+        <div id="connection-status" class="w-2.5 h-2.5 rounded-full bg-slate-300"></div>
+    </header>
+
+    <!-- 1. AGENDA -->
+    <div id="tab-agenda" class="tab-content active">
+        <div class="bg-white rounded-2xl p-4 mb-4 shadow-sm flex justify-between items-center border border-slate-100 sticky top-0 z-10">
+            <button onclick="mudarDia(-1)" class="w-10 h-10 flex items-center justify-center hover:bg-slate-50 rounded-full text-slate-500 btn-anim"><i data-lucide="chevron-left"></i></button>
+            <div class="text-center">
+                <p class="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1" id="dia-semana-display">Hoje</p>
+                <input type="date" id="data-picker" class="text-base font-bold text-slate-800 bg-transparent text-center outline-none cursor-pointer w-full" onchange="carregarAgendamentosDoDia()">
+            </div>
+            <button onclick="mudarDia(1)" class="w-10 h-10 flex items-center justify-center hover:bg-slate-50 rounded-full text-slate-500 btn-anim"><i data-lucide="chevron-right"></i></button>
+        </div>
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden min-h-[400px]">
+            <div id="agenda-timeline" class="timeline-container pl-2 pr-2 pt-4 pb-10">
+                <div class="p-10 text-center text-slate-400 text-sm">Carregando agenda...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. SERVIÇOS -->
+    <div id="tab-servicos" class="tab-content">
+        <div class="flex justify-between items-center mb-6">
+            <h2 class="text-xl font-bold text-slate-800">Serviços</h2>
+            <button onclick="abrirModalServico()" class="text-blue-600 text-sm font-bold bg-blue-50 px-3 py-1.5 rounded-lg btn-anim">+ Novo</button>
+        </div>
+        <div id="lista-servicos" class="space-y-3 pb-24"><div class="text-center text-slate-400 py-10">Carregando...</div></div>
+    </div>
+
+    <!-- 3. PACOTES -->
+    <div id="tab-pacotes" class="tab-content">
+        <div class="flex justify-between items-center mb-6">
+            <h2 class="text-xl font-bold text-slate-800">Pacotes Ativos</h2>
+            <button onclick="abrirModalVenderPacote()" class="text-blue-600 text-sm font-bold bg-blue-50 px-3 py-1.5 rounded-lg btn-anim">+ Vender</button>
+        </div>
+        <div id="lista-pacotes" class="space-y-3 pb-24"><div class="text-center text-slate-400 py-10">Carregando pacotes...</div></div>
+    </div>
+
+    <!-- 4. CONFIGURAÇÕES -->
+    <div id="tab-config" class="tab-content">
+        <h2 class="text-xl font-bold text-slate-800 mb-6">Configurações</h2>
+        <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 space-y-6">
+            <div>
+                <h3 class="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">Funcionamento</h3>
+                <div class="grid grid-cols-2 gap-4">
+                    <div><label class="block text-sm text-slate-600 mb-1 font-medium">Abertura</label><input type="time" id="cfg-abertura" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 outline-none"></div>
+                    <div><label class="block text-sm text-slate-600 mb-1 font-medium">Fecho</label><input type="time" id="cfg-fechamento" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 outline-none"></div>
+                </div>
+            </div>
+            <div>
+                <label class="block text-sm text-slate-600 mb-1 font-medium">Intervalo da Agenda (min)</label>
+                <select id="cfg-intervalo" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 outline-none">
+                    <option value="15">15 minutos</option><option value="30">30 minutos</option><option value="60">60 minutos (1 hora)</option>
+                </select>
+            </div>
+            <div>
+                <label class="flex items-center gap-3"><input type="checkbox" id="cfg-concorrencia" class="w-5 h-5 text-blue-600 rounded"><span class="text-slate-700 font-medium">Permitir Encaixes (Simultâneos)</span></label>
+            </div>
+            <button onclick="salvarConfigAPI(this)" class="w-full py-3 btn-primary font-bold shadow-lg shadow-blue-200 btn-anim">Salvar Alterações</button>
+        </div>
+    </div>
+
+    <div id="main-fab" class="fab btn-anim" onclick="acaoFab()"><i data-lucide="plus"></i></div>
+
+    <!-- ================= MODAIS ================= -->
+
+    <!-- MODAL DE CONFIRMAÇÃO -->
+    <div id="modal-confirmacao" class="modal-overlay" style="z-index: 70;">
+        <div class="modal-card max-w-sm">
+            <h3 class="text-lg font-bold text-slate-800 mb-2" id="confirm-titulo">Confirmar</h3>
+            <p class="text-slate-600 mb-6 text-sm" id="confirm-msg">Tem certeza?</p>
+            <div class="flex gap-3">
+                <button id="btn-confirm-no" class="flex-1 py-3 text-slate-500 font-bold hover:bg-slate-100 rounded-xl btn-anim">Cancelar</button>
+                <button id="btn-confirm-yes" class="flex-1 py-3 bg-blue-600 text-white font-bold rounded-xl shadow-lg shadow-blue-200 btn-anim">Sim</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL DE AVISO -->
+    <div id="modal-aviso" class="modal-overlay" style="z-index: 80;">
+        <div class="modal-card max-w-sm text-center">
+            <div class="mx-auto w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mb-4 text-blue-600"><i data-lucide="info" class="w-6 h-6"></i></div>
+            <p class="text-slate-800 font-medium mb-6" id="aviso-msg">Mensagem</p>
+            <button onclick="fecharModal('modal-aviso')" class="w-full py-3 bg-slate-100 text-slate-700 font-bold rounded-xl btn-anim">OK</button>
+        </div>
+    </div>
+
+    <!-- MODAL AGENDAMENTO -->
+    <div id="modal-agendamento" class="modal-overlay">
+        <div class="modal-card">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-xl font-bold text-slate-800">Novo Agendamento</h3>
+                <button onclick="fecharModal('modal-agendamento')"><i data-lucide="x" class="text-slate-400"></i></button>
+            </div>
+            <form id="form-agendamento" onsubmit="salvarAgendamento(event)">
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase mb-1 ml-1">Cliente</label>
+                        <div class="flex gap-2">
+                            <input list="lista-clientes" type="text" id="input-cliente-nome" name="nome_cliente" required placeholder="Buscar cliente..." 
+                                class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500" onchange="verificarPacoteDisponivel()">
+                            <datalist id="lista-clientes"></datalist>
+                            <button type="button" onclick="abrirModalCliente()" class="p-3 bg-blue-100 text-blue-600 rounded-xl hover:bg-blue-200 btn-anim" title="Cadastrar novo cliente">
+                                <i data-lucide="user-plus" class="w-5 h-5"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase mb-1 ml-1">Serviço</label>
+                        <input list="lista-servicos-datalist" type="text" id="input-servico-nome" name="nome_servico" required placeholder="Buscar serviço..." 
+                            class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500" onchange="verificarPacoteDisponivel()">
+                        <datalist id="lista-servicos-datalist"></datalist>
+                    </div>
+                    <div id="area-pacote-info" class="hidden bg-green-50 p-3 rounded-xl border border-green-200 flex items-center justify-between">
+                        <div>
+                            <p class="text-xs font-bold text-green-700 uppercase">Pacote Disponível</p>
+                            <p class="text-sm text-green-800">Restam <span id="pacote-saldo">0</span> sessões</p>
+                        </div>
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" id="check-usar-pacote" class="w-5 h-5 text-green-600 rounded focus:ring-green-500" checked>
+                            <span class="text-sm font-bold text-green-700">Usar</span>
+                        </label>
+                        <input type="hidden" id="id-pacote-selecionado">
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div><label class="block text-xs font-bold text-slate-500 uppercase mb-1 ml-1">Data</label><input type="date" id="input-data-modal" name="data_agendamento" required class="w-full p-3 bg-slate-50 border rounded-xl outline-none"></div>
+                        <div><label class="block text-xs font-bold text-slate-500 uppercase mb-1 ml-1">Horário</label><input type="time" id="input-hora-modal" name="hora_inicio" required class="w-full p-3 bg-slate-50 border rounded-xl outline-none"></div>
+                    </div>
+                </div>
+                <button type="submit" id="btn-salvar-agenda" class="w-full mt-6 py-3 btn-primary font-bold btn-anim">Confirmar</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL VENDER PACOTE -->
+    <div id="modal-vender-pacote" class="modal-overlay">
+        <div class="modal-card">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-xl font-bold text-slate-800">Vender Pacote</h3>
+                <button onclick="fecharModal('modal-vender-pacote')"><i data-lucide="x" class="text-slate-400"></i></button>
+            </div>
+            <form id="form-pacote" onsubmit="salvarVendaPacote(event)">
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase mb-1 ml-1">Cliente</label>
+                        <input list="lista-clientes" name="nome_cliente" required placeholder="Buscar cliente..." class="w-full p-3 bg-slate-50 border rounded-xl outline-none">
+                    </div>
+                    <div class="bg-slate-50 p-3 rounded-xl border border-slate-200">
+                        <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Adicionar Itens</label>
+                        <div class="flex gap-2 mb-2">
+                            <input list="lista-servicos-datalist" type="text" id="input-servico-pacote-nome" placeholder="Buscar serviço..." class="flex-1 p-2 bg-white border rounded-lg text-sm outline-none">
+                            <input type="number" id="qtd-servico-pacote" value="1" min="1" class="w-16 p-2 bg-white border rounded-lg text-sm text-center outline-none">
+                            <button type="button" onclick="adicionarItemAoPacote()" class="p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 btn-anim"><i data-lucide="plus" class="w-4 h-4"></i></button>
+                        </div>
+                        <div id="lista-itens-pacote" class="space-y-1 mb-2 max-h-40 overflow-y-auto">
+                            <p class="text-xs text-slate-400 text-center py-2">Nenhum item adicionado.</p>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div><label class="block text-xs font-bold text-slate-500 uppercase mb-1 ml-1">Validade</label><input type="date" name="validade" class="w-full p-3 bg-slate-50 border rounded-xl outline-none"></div>
+                        <div><label class="block text-xs font-bold text-slate-500 uppercase mb-1 ml-1">Valor Total</label><input type="number" step="0.01" id="valor-total-pacote" name="valor_total" required placeholder="0,00" class="w-full p-3 bg-slate-50 border rounded-xl outline-none font-bold text-slate-700 text-lg"></div>
+                    </div>
+                </div>
+                <button type="submit" id="btn-salvar-pacote" class="w-full mt-6 py-3 btn-primary font-bold btn-anim">Confirmar Venda</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL DETALHES -->
+    <div id="modal-detalhes" class="modal-overlay">
+        <div class="modal-card">
+            <div class="flex justify-between items-center mb-4"><h3 class="text-lg font-bold">Detalhes</h3><button onclick="fecharModal('modal-detalhes')"><i data-lucide="x"></i></button></div>
+            <div id="detalhes-conteudo" class="mb-4"></div>
+            <div class="flex flex-col gap-3">
+                <button id="btn-confirmar" class="p-3 bg-blue-50 text-blue-700 font-bold rounded-xl text-sm border border-blue-100 flex items-center justify-center gap-2 btn-anim"><i data-lucide="thumbs-up" class="w-4 h-4"></i> Confirmar Presença</button>
+                <button onclick="prepararStatus('Concluido', this)" class="p-3 bg-slate-100 text-slate-600 font-bold rounded-xl text-sm flex items-center justify-center gap-2 btn-anim"><i data-lucide="check" class="w-4 h-4"></i> Concluir (Realizado)</button>
+                <div class="grid grid-cols-2 gap-2 mt-2">
+                    <button onclick="prepararStatus('Cancelado', this)" class="p-3 bg-yellow-100 text-yellow-700 font-bold rounded-xl text-sm hover:bg-yellow-200 btn-anim">Cancelar</button>
+                    <button onclick="prepararStatus('Excluir', this)" class="p-3 bg-red-100 text-red-700 font-bold rounded-xl text-sm hover:bg-red-200 btn-anim">Apagar</button>
+                </div>
+            </div>
+            <input type="hidden" id="id-agendamento-ativo">
+            <input type="hidden" id="id-pacote-agendamento-ativo">
+        </div>
+    </div>
+
+    <!-- OUTROS MODAIS -->
+    <div id="modal-cliente" class="modal-overlay">
+        <div class="modal-card">
+            <div class="flex justify-between items-center mb-6"><h3 class="text-xl font-bold text-slate-800">Cadastrar Cliente</h3><button onclick="fecharModal('modal-cliente')"><i data-lucide="x" class="text-slate-400"></i></button></div>
+            <form id="form-cliente" onsubmit="salvarNovoCliente(event)">
+                <div class="space-y-4">
+                    <input type="text" name="nome" required class="w-full p-3 bg-slate-50 border rounded-xl outline-none" placeholder="Nome Completo">
+                    <input type="tel" name="whatsapp" class="w-full p-3 bg-slate-50 border rounded-xl outline-none" placeholder="WhatsApp">
+                    <input type="email" name="email" class="w-full p-3 bg-slate-50 border rounded-xl outline-none" placeholder="Email">
+                </div>
+                <button type="submit" id="btn-salvar-cliente" class="w-full mt-6 py-3 btn-primary font-bold btn-anim">Salvar e Usar</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="modal-servico" class="modal-overlay">
+        <div class="modal-card">
+            <div class="flex justify-between items-center mb-6"><h3 class="text-xl font-bold text-slate-800">Novo Serviço</h3><button onclick="fecharModal('modal-servico')"><i data-lucide="x" class="text-slate-400"></i></button></div>
+            <form id="form-servico" onsubmit="salvarNovoServico(event)">
+                <div class="space-y-4">
+                    <input type="text" name="nome_servico" required placeholder="Nome do Serviço" class="w-full p-3 bg-slate-50 border rounded-xl outline-none">
+                    <div class="grid grid-cols-2 gap-3"><input type="number" step="0.01" name="valor_unitario" placeholder="Preço" required class="w-full p-3 bg-slate-50 border rounded-xl outline-none"><input type="number" name="duracao_minutos" placeholder="Minutos" required value="60" class="w-full p-3 bg-slate-50 border rounded-xl outline-none"></div>
+                    
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Imagem do Serviço</label>
+                        <input type="file" id="input-imagem-servico" accept="image/*" class="w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+                    </div>
+
+                    <div>
+                        <label class="flex items-center gap-3 p-2 bg-slate-50 rounded-lg cursor-pointer">
+                            <input type="checkbox" id="check-online-booking" class="w-5 h-5 text-blue-600 rounded">
+                            <span class="text-sm font-bold text-slate-700">Permitir Agendamento Online</span>
+                        </label>
+                    </div>
+
+                    <div><p class="text-xs font-bold text-slate-500 mb-2">Cor</p><div id="color-picker-container" class="flex justify-between"></div><input type="hidden" name="cor_hex" id="input-cor-selecionada" value="#3b82f6"></div>
+                </div>
+                <button type="submit" id="btn-salvar-servico" class="w-full mt-6 py-3 btn-primary font-bold btn-anim">Salvar</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="modal-detalhes-pacote" class="modal-overlay">
+        <div class="modal-card">
+            <div class="flex justify-between items-center mb-4"><h3 class="text-xl font-bold text-slate-800">Detalhes do Pacote</h3><button onclick="fecharModal('modal-detalhes-pacote')"><i data-lucide="x" class="text-slate-400"></i></button></div>
+            <div class="modal-tabs">
+                <div class="modal-tab active" onclick="switchModalTab('saldos')">Saldos</div>
+                <div class="modal-tab" onclick="switchModalTab('historico')">Histórico</div>
+            </div>
+            <div id="tab-modal-saldos" class="modal-tab-content active space-y-3 max-h-60 overflow-y-auto"></div>
+            <div id="tab-modal-historico" class="modal-tab-content space-y-2 max-h-60 overflow-y-auto"><p class="text-center text-slate-400 text-sm">Carregando histórico...</p></div>
+        </div>
+    </div>
+
+    <nav class="bottom-nav">
+        <div class="nav-item active" onclick="switchTab('agenda', this)"><i data-lucide="calendar"></i><span>Agenda</span></div>
+        <div class="nav-item" onclick="switchTab('servicos', this)"><i data-lucide="sparkles"></i><span>Serviços</span></div>
+        <div class="nav-item" onclick="switchTab('pacotes', this)"><i data-lucide="package"></i><span>Pacotes</span></div>
+        <div class="nav-item" onclick="switchTab('config', this)"><i data-lucide="settings-2"></i><span>Config</span></div>
+    </nav>
+
+    <script>
+        const API_URL = 'https://script.google.com/macros/s/AKfycbxgSkDYPhTJerGbFsubJE9b_xuwCM6KnAtWh5gFF3WEIEGFWf-SIHd_iWUH3J4JitWUHA/exec';
+        const PALETA_CORES = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6', '#a855f7'];
+        const IMGBB_API_KEY = 'fa0265b3bfc740c1eb09a7e4d6ec493a';
+
+        let dataAtual = new Date();
+        let servicosCache = [], agendamentosCache = [], clientesCache = [], pacotesCache = [];
+        let itensPacoteTemp = [];
+        let abaAtiva = 'agenda';
+        let config = { abertura: '08:00', fechamento: '19:00', intervalo_minutos: 60, permite_encaixe: false };
+
+        document.addEventListener('DOMContentLoaded', () => {
+            lucide.createIcons();
+            testarConexao();
+            carregarConfiguracoesAPI();
+            renderizarColorPicker();
+        });
+
+        // --- SISTEMA DE ALERTA E CONFIRMAÇÃO ---
+        function mostrarAviso(msg) {
+            document.getElementById('aviso-msg').innerText = msg;
+            document.getElementById('modal-aviso').classList.add('open');
+        }
+
+        function mostrarConfirmacao(titulo, msg, callbackSim, callbackNao = null, textoSim = 'Sim', textoNao = 'Cancelar') {
+            document.getElementById('confirm-titulo').innerText = titulo;
+            document.getElementById('confirm-msg').innerText = msg;
+            
+            const btnSim = document.getElementById('btn-confirm-yes');
+            const btnNao = document.getElementById('btn-confirm-no');
+            
+            btnSim.innerText = textoSim;
+            btnNao.innerText = textoNao;
+            
+            // Clone para remover listeners anteriores
+            const novoBtnSim = btnSim.cloneNode(true);
+            const novoBtnNao = btnNao.cloneNode(true);
+            
+            btnSim.parentNode.replaceChild(novoBtnSim, btnSim);
+            btnNao.parentNode.replaceChild(novoBtnNao, btnNao);
+            
+            novoBtnSim.onclick = () => {
+                setLoading(novoBtnSim, true, textoSim);
+                // Fecha modal no callback para evitar travamento visual imediato
+                const resultado = callbackSim(); 
+            };
+            
+            novoBtnNao.onclick = () => {
+                fecharModal('modal-confirmacao');
+                if(callbackNao) callbackNao(); 
+            };
+            
+            document.getElementById('modal-confirmacao').classList.add('open');
+        }
+
+        function setLoading(btn, isLoading, text) {
+            if (isLoading) {
+                btn.disabled = true;
+                btn.innerHTML = `<span class="spinner ${btn.classList.contains('bg-slate-100') || btn.classList.contains('text-slate-500') ? 'spinner-dark' : ''}"></span> ${text === 'Sim' ? 'Processando...' : 'Aguarde...'}`;
+            } else {
+                btn.disabled = false;
+                btn.innerHTML = text;
+            }
+        }
+
+        // --- CORE FUNCTIONS ---
+        function getCorServico(s) { if(!s) return '#3b82f6'; return s.cor_hex || s.cor || s.color || s.Cor || s['Cor Hex'] || '#3b82f6'; }
+        function hexToRgba(hex, a) { if(!hex) return `rgba(59, 130, 246, ${a})`; hex = hex.replace('#',''); return `rgba(${parseInt(hex.substring(0,2),16)}, ${parseInt(hex.substring(2,4),16)}, ${parseInt(hex.substring(4,6),16)}, ${a})`; }
+
+        async function carregarConfiguracoesAPI() {
+            try {
+                const r = await fetch(`${API_URL}?action=getConfig`);
+                const dados = await r.json();
+                if(dados && dados.abertura) config = dados;
+                document.getElementById('cfg-abertura').value = config.abertura;
+                document.getElementById('cfg-fechamento').value = config.fechamento;
+                document.getElementById('cfg-intervalo').value = config.intervalo_minutos;
+                document.getElementById('cfg-concorrencia').checked = config.permite_encaixe;
+                
+                atualizarPickerData();
+                await carregarServicos(); 
+                carregarClientes(); 
+                carregarPacotes(); 
+                carregarAgendamentosDoDia();
+            } catch(e) { console.error("Erro config", e); }
+        }
+
+        async function salvarConfigAPI(btn) { 
+            const originalText = btn.innerText;
+            setLoading(btn, true, originalText);
+            const novaConfig = { action: 'saveConfig', abertura: document.getElementById('cfg-abertura').value, fechamento: document.getElementById('cfg-fechamento').value, intervalo_minutos: document.getElementById('cfg-intervalo').value, permite_encaixe: document.getElementById('cfg-concorrencia').checked }; 
+            try { 
+                await fetch(API_URL, {method:'POST',body:JSON.stringify(novaConfig)}); 
+                config={...config, ...novaConfig, intervalo_minutos:parseInt(novaConfig.intervalo_minutos)}; 
+                mostrarAviso('Configurações salvas!'); 
+                carregarAgendamentosDoDia(); 
+            } catch(e){ mostrarAviso('Erro ao salvar'); } 
+            finally{ setLoading(btn, false, originalText); } 
+        }
+
+        async function carregarAgendamentosDoDia() { 
+            const container = document.getElementById('agenda-timeline'); 
+            container.innerHTML = '<div class="p-10 text-center text-slate-400"><div class="spinner spinner-dark mx-auto mb-2 border-slate-300 border-t-blue-500"></div><p>Carregando...</p></div>'; 
+            try { 
+                const r = await fetch(`${API_URL}?action=getAgendamentos`); 
+                const dados = await r.json();
+                if (dados && dados.status === 'erro') throw new Error(dados.mensagem);
+                agendamentosCache = Array.isArray(dados) ? dados : [];
+                renderizarGrade(); 
+            } catch (e) { 
+                container.innerHTML = `<p class="text-center text-red-400 text-sm">Erro ao carregar agenda.<br>${e.message}</p>`; 
+            } 
+        }
+
+        async function salvarAgendamento(e) { 
+            e.preventDefault(); 
+            const btn=document.getElementById('btn-salvar-agenda'); 
+            const originalText = btn.innerText;
+            setLoading(btn, true, originalText);
+            const f=e.target; 
+            
+            const cliente = clientesCache.find(c => c.nome === f.nome_cliente.value); 
+            const idCliente = cliente ? cliente.id_cliente : null; 
+            const nomeServico = f.nome_servico.value;
+            const servico = servicosCache.find(s => s.nome_servico.toLowerCase() === nomeServico.toLowerCase()); 
+            
+            if(!servico) { mostrarAviso('Serviço não encontrado.'); setLoading(btn, false, originalText); return; } 
+            
+            const idServico = servico.id_servico; 
+            const checkPacote = document.getElementById('check-usar-pacote').checked; 
+            const idPacote = checkPacote ? document.getElementById('id-pacote-selecionado').value : null; 
+            
+            try{ 
+                await fetch(API_URL,{method:'POST',body:JSON.stringify({
+                    action:'createAgendamento', 
+                    nome_cliente:f.nome_cliente.value, 
+                    id_cliente: idCliente, 
+                    id_servico: idServico, 
+                    data_agendamento:f.data_agendamento.value, 
+                    hora_inicio:f.hora_inicio.value, 
+                    usar_pacote_id: idPacote 
+                })}); 
+                fecharModal('modal-agendamento'); 
+                f.reset(); 
+                carregarAgendamentosDoDia(); 
+                setTimeout(carregarPacotes, 1000); 
+            }catch(err){mostrarAviso('Erro ao agendar');}finally{setLoading(btn, false, originalText);} 
+        }
+
+        // --- PREPARAÇÃO DE STATUS COM RESET DE BOTÃO ---
+        function prepararStatus(st, btnEl) {
+            const id = document.getElementById('id-agendamento-ativo').value;
+            const idPacote = document.getElementById('id-pacote-agendamento-ativo').value;
+            
+            // Se o botão foi passado, usa para efeito de loading local
+            // Se for via modal de confirmação, btnEl é null
+            
+            if (st === 'Excluir') {
+                mostrarConfirmacao(
+                    'Apagar Agendamento', 
+                    'Tem certeza? Se tiver pacote, o saldo será devolvido.', 
+                    () => executarMudancaStatus(id, st, true, null) 
+                );
+            } else if (st === 'Cancelado' && idPacote && idPacote !== 'null' && idPacote !== '') {
+                mostrarConfirmacao(
+                    'Cancelar com Pacote', 
+                    'Deseja devolver o crédito ao pacote do cliente?', 
+                    () => executarMudancaStatus(id, st, true, null),
+                    () => executarMudancaStatus(id, st, false, null),
+                    'Sim, Devolver',
+                    'Não, Debitar'
+                );
+            } else if (st === 'Confirmado') {
+                 // Chama direto, mas passamos btnEl para animar
+                 if(btnEl) {
+                     setLoading(btnEl, true, btnEl.innerText);
+                     // Usa setTimeout para garantir que a UI atualize antes do fetch
+                     setTimeout(() => executarMudancaStatus(id, st, false, btnEl), 10);
+                 } else {
+                     executarMudancaStatus(id, st, false, null);
+                 }
+            } else {
+                executarMudancaStatus(id, st, false, btnEl);
+            }
+        }
+
+        async function executarMudancaStatus(id, st, devolver, btnEl) {
+            let originalText = '';
+            if (btnEl) {
+                originalText = btnEl.innerHTML; 
+                // Já setamos loading no prepararStatus, mas garantimos aqui se vier direto
+                if(!btnEl.disabled) setLoading(btnEl, true, originalText.replace(/<[^>]*>/g, '').trim());
+            }
+
+            try { 
+                await fetch(API_URL, {method:'POST', body:JSON.stringify({action:'updateStatusAgendamento', id_agendamento:id, novo_status:st, devolver_credito: devolver})});
+                
+                fecharModal('modal-confirmacao'); 
+                fecharModal('modal-detalhes'); 
+                
+                carregarAgendamentosDoDia(); 
+                if(devolver) setTimeout(carregarPacotes, 1500);
+            } catch(e){ 
+                mostrarAviso('Erro ao atualizar status'); 
+                if(btnEl) setLoading(btnEl, false, originalText); // Restaura em caso de erro
+            } 
+        }
+
+        // --- SERVIÇOS COM UPLOAD ---
+        async function salvarNovoServico(e) { 
+            e.preventDefault(); 
+            const btn = document.getElementById('btn-salvar-servico'); 
+            const originalText = btn.innerText; 
+            setLoading(btn, true, originalText); 
+            
+            const f = e.target; 
+            const fileInput = document.getElementById('input-imagem-servico');
+            let imagemUrl = '';
+
+            if (fileInput.files.length > 0) {
+                btn.innerHTML = '<span class="spinner"></span> Enviando img...';
+                try {
+                    const formData = new FormData();
+                    formData.append('image', fileInput.files[0]);
+                    const imgReq = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, { method: 'POST', body: formData });
+                    const imgRes = await imgReq.json();
+                    if (imgRes.success) { imagemUrl = imgRes.data.url; } 
+                } catch (err) { console.error(err); }
+            }
+
+            try { 
+                await fetch(API_URL,{method:'POST',body:JSON.stringify({
+                    action:'createServico', 
+                    nome_servico:f.nome_servico.value, 
+                    valor_unitario:f.valor_unitario.value, 
+                    duracao_minutos:f.duracao_minutos.value, 
+                    cor_hex:document.getElementById('input-cor-selecionada').value,
+                    imagem_url: imagemUrl,
+                    online_booking: document.getElementById('check-online-booking').checked
+                })}); 
+                
+                fecharModal('modal-servico'); 
+                f.reset(); 
+                carregarServicos(); 
+            } catch(e){ mostrarAviso('Erro ao salvar serviço'); } 
+            finally { setLoading(btn, false, originalText); } 
+        }
+
+        async function carregarServicos() { try{const r=await fetch(`${API_URL}?action=getServicos`); servicosCache=await r.json(); const datalist = document.getElementById('lista-servicos-datalist'); datalist.innerHTML = ''; servicosCache.forEach(i=>{const o=document.createElement('option');o.value=i.nome_servico; datalist.appendChild(o);}); renderizarListaServicos();} catch(e){}}
+        
+        function renderizarListaServicos() { 
+            const c=document.getElementById('lista-servicos'); 
+            c.innerHTML=''; 
+            servicosCache.forEach(s=>{ 
+                const cor=getCorServico(s); 
+                const iconeHtml = s.imagem_url 
+                    ? `<img src="${s.imagem_url}" class="w-10 h-10 rounded-full object-cover border-2 border-white shadow-sm">` 
+                    : `<div class="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold shadow-sm" style="background-color:${cor}">${s.nome_servico.charAt(0).toUpperCase()}</div>`;
+                
+                c.innerHTML+=`
+                    <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex justify-between items-center mb-2">
+                        <div class="flex items-center gap-3">
+                            ${iconeHtml}
+                            <div>
+                                <h4 class="font-bold text-slate-800">${s.nome_servico}</h4>
+                                <p class="text-xs text-slate-400">${s.duracao_minutos} min • R$${s.valor_unitario}</p>
+                            </div>
+                        </div>
+                    </div>`; 
+            }); 
+        }
+        
+        async function carregarClientes() { try { const r=await fetch(`${API_URL}?action=getClientes`); clientesCache=await r.json(); atualizarDatalistClientes(); } catch(e){ console.error("Erro clientes", e); } }
+        function atualizarDatalistClientes() { const dl=document.getElementById('lista-clientes'); if(dl) { dl.innerHTML=''; clientesCache.forEach(c=>{ const o=document.createElement('option'); o.value=c.nome; dl.appendChild(o); }); } }
+        async function salvarNovoCliente(e) { e.preventDefault(); const btn=document.getElementById('btn-salvar-cliente'); const originalText = btn.innerText; setLoading(btn, true, originalText); const f=e.target; try{ const r=await fetch(API_URL,{method:'POST',body:JSON.stringify({action:'createCliente',nome:f.nome.value,whatsapp:f.whatsapp.value,email:f.email.value})}); const j=await r.json(); if(j.status==='sucesso'){ clientesCache.push({nome:j.nome,id_cliente:j.id_cliente}); clientesCache.sort((a,b) => a.nome.localeCompare(b.nome)); atualizarDatalistClientes(); document.getElementById('input-cliente-nome').value=j.nome; fecharModal('modal-cliente'); f.reset(); } else { mostrarAviso(j.mensagem); } }catch(e){mostrarAviso('Erro');}finally{setLoading(btn, false, originalText);} }
+
+        async function carregarPacotes() { const container = document.getElementById('lista-pacotes'); try { container.innerHTML = '<div class="text-center py-10 text-slate-400"><div class="spinner spinner-dark mx-auto mb-2 border-slate-300 border-t-blue-500"></div><p>Atualizando...</p></div>'; const r = await fetch(`${API_URL}?action=getPacotes`); const dados = await r.json(); pacotesCache = Array.isArray(dados) ? dados : []; renderizarListaPacotes(); } catch(e) { container.innerHTML = '<div class="text-center py-10 text-red-400">Erro ao carregar.</div>'; } }
+        function renderizarListaPacotes() { const c = document.getElementById('lista-pacotes'); c.innerHTML = ''; if(!pacotesCache || pacotesCache.length === 0) { c.innerHTML='<div class="text-center py-10 text-slate-400">Nenhum pacote vendido.</div>'; return; } const grupos = {}; pacotesCache.forEach(p => { const id = p.id_transacao || p.id_pacote; if(!grupos[id]) grupos[id] = { cliente: p.nome_cliente, data: p.data_compra, itens: [] }; grupos[id].itens.push(p); }); Object.values(grupos).forEach(g => { const resumo = g.itens.map(i => { const servico = servicosCache.find(s => String(s.id_servico) === String(i.id_servico)); return `${i.qtd_restante}/${i.qtd_total} ${servico ? servico.nome_servico : 'Serviço'}`; }).join(', '); const card = document.createElement('div'); card.className = 'bg-white p-4 rounded-xl shadow-sm border border-slate-100 mb-2 cursor-pointer hover:bg-slate-50 transition'; card.onclick = () => abrirDetalhesPacote(g); card.innerHTML = ` <div class="flex justify-between items-center mb-1"> <h4 class="font-bold text-slate-800">${g.cliente || 'Cliente'}</h4> <span class="text-xs text-slate-400">${formatarDataBr(g.data)}</span> </div> <p class="text-xs text-slate-500 truncate">${resumo}</p> `; c.appendChild(card); }); }
+        
+        function abrirModalVenderPacote() { itensPacoteTemp = []; atualizarListaVisualPacote(); document.getElementById('input-servico-pacote-nome').value = ''; document.getElementById('valor-total-pacote').value = ''; document.getElementById('modal-vender-pacote').classList.add('open'); }
+        function abrirModalAgendamento(h) { document.getElementById('modal-agendamento').classList.add('open'); document.getElementById('input-data-modal').value = dataAtual.toISOString().split('T')[0]; if(h) document.getElementById('input-hora-modal').value = h; }
+        function abrirModalCliente() { document.getElementById('modal-cliente').classList.add('open'); }
+        function abrirModalServico() { document.getElementById('modal-servico').classList.add('open'); }
+        function fecharModal(id) { document.getElementById(id).classList.remove('open'); if(id==='modal-agendamento') document.getElementById('area-pacote-info')?.classList.add('hidden'); }
+        
+        function abrirModalDetalhes(id) { 
+            const ag = agendamentosCache.find(a => a.id_agendamento === id); if(!ag) return; 
+            
+            // DADOS
+            document.getElementById('id-agendamento-ativo').value = id; 
+            const idPacote = ag.id_pacote_usado || ag.id_pacote || ''; 
+            document.getElementById('id-pacote-agendamento-ativo').value = idPacote;
+            const servico = servicosCache.find(s => String(s.id_servico) === String(ag.id_servico)); 
+            const nomeCliente = ag.nome_cliente || ag.observacoes || 'Cliente'; 
+            let htmlPacote = idPacote ? '<span class="bg-green-100 text-green-700 text-[10px] px-2 py-0.5 rounded ml-2">Pacote</span>' : '';
+            
+            // RESET DO BOTÃO CONFIRMAR
+            const btnConfirmar = document.getElementById('btn-confirmar');
+            
+            // Estado padrão (ativo)
+            btnConfirmar.disabled = false;
+            btnConfirmar.innerHTML = '<i data-lucide="thumbs-up" class="w-4 h-4"></i> Confirmar Presença';
+            btnConfirmar.className = "p-3 bg-blue-50 text-blue-700 font-bold rounded-xl text-sm border border-blue-100 flex items-center justify-center gap-2 btn-anim";
+            
+            // Importante: Remover listener antigo para não acumular
+            const novoBtnConfirmar = btnConfirmar.cloneNode(true);
+            btnConfirmar.parentNode.replaceChild(novoBtnConfirmar, btnConfirmar);
+
+            novoBtnConfirmar.onclick = () => prepararStatus('Confirmado', novoBtnConfirmar);
+
+            // LOGICA DE EXIBIÇÃO DO BOTAO
+            if (ag.status === 'Confirmado') {
+                novoBtnConfirmar.innerHTML = '<i data-lucide="check-circle" class="w-4 h-4"></i> Já Confirmado';
+                novoBtnConfirmar.className = "p-3 bg-green-100 text-green-700 font-bold rounded-xl text-sm border border-green-200 flex items-center justify-center gap-2 cursor-default";
+                novoBtnConfirmar.onclick = null; 
+                novoBtnConfirmar.disabled = true;
+                novoBtnConfirmar.style.display = 'flex';
+            } else if (['Concluido', 'Cancelado'].includes(ag.status)) {
+                novoBtnConfirmar.style.display = 'none';
+            } else {
+                novoBtnConfirmar.style.display = 'flex';
+            }
+
+            document.getElementById('detalhes-conteudo').innerHTML = `<div class="p-3 bg-slate-50 rounded-xl border border-slate-100"><p class="text-xs font-bold text-slate-400 uppercase">Cliente</p><p class="font-bold text-slate-800 text-lg mb-2">${nomeCliente}</p><p class="text-xs font-bold text-slate-400 uppercase">Serviço</p><p class="text-slate-700 mb-2 flex items-center">${servico ? servico.nome_servico : '...'} ${htmlPacote}</p><p class="text-xs font-bold text-slate-400 uppercase">Horário</p><p class="font-mono text-slate-700">${ag.hora_inicio} - ${ag.hora_fim}</p><p class="mt-2 text-xs font-bold uppercase status-text">${ag.status || 'Agendado'}</p></div>`; 
+            
+            document.getElementById('modal-detalhes').classList.add('open'); 
+            lucide.createIcons(); 
+        }
+
+        function abrirDetalhesPacote(grupo) {
+            const modal = document.getElementById('modal-detalhes-pacote');
+            const divSaldos = document.getElementById('tab-modal-saldos');
+            const divHist = document.getElementById('tab-modal-historico');
+            divSaldos.innerHTML = ''; divHist.innerHTML = '';
+            
+            const idsPacotesDoGrupo = grupo.itens.map(i => String(i.id_pacote));
+            grupo.itens.forEach(item => {
+                const servico = servicosCache.find(s => String(s.id_servico) === String(item.id_servico));
+                const nome = servico ? servico.nome_servico : 'Serviço';
+                const percent = (item.qtd_restante / item.qtd_total) * 100;
+                divSaldos.innerHTML += `<div class="mb-2"><div class="flex justify-between text-sm mb-1"><span class="text-slate-700 font-medium">${nome}</span><span class="text-blue-600 font-bold">${item.qtd_restante}/${item.qtd_total}</span></div><div class="w-full bg-slate-100 rounded-full h-2"><div class="bg-blue-500 h-2 rounded-full" style="width: ${percent}%"></div></div></div>`;
+            });
+
+            const historico = agendamentosCache.filter(ag => { const idUsado = String(ag.id_pacote_usado || ag.id_pacote || ''); return idsPacotesDoGrupo.includes(idUsado); });
+            if (historico.length === 0) { divHist.innerHTML = '<p class="text-center text-slate-400 text-sm py-4">Nenhum uso registrado hoje.</p>'; } 
+            else { 
+                historico.forEach(h => { 
+                    const servico = servicosCache.find(s => String(s.id_servico) === String(h.id_servico));
+                    const nomeServico = servico ? servico.nome_servico : 'Serviço';
+                    const statusClass = h.status === 'Concluido' ? 'text-green-600' : (h.status === 'Cancelado' ? 'text-red-400 line-through' : 'text-blue-600');
+                    divHist.innerHTML += `<div class="flex justify-between items-center bg-slate-50 p-2 rounded border border-slate-100 text-sm"><div><p class="font-bold text-slate-700">${formatarDataBr(h.data_agendamento)} <span class="font-normal text-xs text-slate-400">${h.hora_inicio}</span></p><p class="text-xs text-slate-500">${nomeServico}</p></div><span class="text-xs font-bold uppercase ${statusClass}">${h.status}</span></div>`; 
+                }); 
+            }
+            modal.classList.add('open');
+        }
+
+        function switchModalTab(tab) { document.querySelectorAll('.modal-tab').forEach(t => t.classList.remove('active')); document.querySelectorAll('.modal-tab-content').forEach(c => c.classList.remove('active')); const tabs = document.querySelectorAll('.modal-tab'); if(tab === 'saldos') { tabs[0].classList.add('active'); document.getElementById('tab-modal-saldos').classList.add('active'); } else { tabs[1].classList.add('active'); document.getElementById('tab-modal-historico').classList.add('active'); } }
+        function adicionarItemAoPacote() { const nomeServico = document.getElementById('input-servico-pacote-nome').value; const qtdInput = document.getElementById('qtd-servico-pacote'); const qtd = parseInt(qtdInput.value); if(!nomeServico || qtd < 1) return; const servico = servicosCache.find(s => s.nome_servico.toLowerCase() === nomeServico.toLowerCase()); if(!servico) { mostrarAviso('Serviço não encontrado na lista.'); return; } const subtotal = (parseFloat(servico.valor_unitario || 0) * qtd); itensPacoteTemp.push({ id_servico: servico.id_servico, nome_servico: servico.nome_servico, valor_unitario: servico.valor_unitario, qtd: qtd, subtotal: subtotal }); atualizarListaVisualPacote(); atualizarTotalSugerido(); document.getElementById('input-servico-pacote-nome').value = ""; qtdInput.value = "1"; }
+        function atualizarListaVisualPacote() { const container = document.getElementById('lista-itens-pacote'); container.innerHTML = ''; if(itensPacoteTemp.length === 0) { container.innerHTML = '<p class="text-xs text-slate-400 text-center py-2">Nenhum item adicionado.</p>'; return; } itensPacoteTemp.forEach((item, index) => { const div = document.createElement('div'); div.className = 'flex justify-between items-center bg-white p-2 rounded border border-slate-100 text-sm'; const subtotalFmt = item.subtotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }); div.innerHTML = ` <div class="flex-1"> <div class="flex justify-between items-center"> <span class="font-medium text-slate-700">${item.qtd}x ${item.nome_servico}</span> <span class="text-xs text-slate-500 font-medium ml-2">= ${subtotalFmt}</span> </div> </div> <button type="button" onclick="removerItemPacote(${index})" class="ml-3 text-red-400 hover:text-red-600 btn-anim"><i data-lucide="trash-2" class="w-4 h-4"></i></button> `; container.appendChild(div); }); lucide.createIcons(); }
+        function removerItemPacote(index) { itensPacoteTemp.splice(index, 1); atualizarListaVisualPacote(); atualizarTotalSugerido(); }
+        function atualizarTotalSugerido() { const total = itensPacoteTemp.reduce((acc, item) => acc + item.subtotal, 0); document.getElementById('valor-total-pacote').value = total.toFixed(2); }
+        function verificarPacoteDisponivel() { const nomeCliente = document.getElementById('input-cliente-nome').value; const nomeServico = document.getElementById('input-servico-nome').value; const areaInfo = document.getElementById('area-pacote-info'); const checkbox = document.getElementById('check-usar-pacote'); const inputIdPacote = document.getElementById('id-pacote-selecionado'); areaInfo.classList.add('hidden'); inputIdPacote.value = ''; checkbox.checked = false; if(!nomeCliente || !nomeServico) return; const cliente = clientesCache.find(c => c.nome.toLowerCase() === nomeCliente.toLowerCase()); const servico = servicosCache.find(s => s.nome_servico.toLowerCase() === nomeServico.toLowerCase()); if(!cliente || !servico) return; const pacote = pacotesCache.find(p => String(p.id_cliente) === String(cliente.id_cliente) && String(p.id_servico) === String(servico.id_servico) && parseInt(p.qtd_restante) > 0); if(pacote) { areaInfo.classList.remove('hidden'); areaInfo.classList.add('flex'); document.getElementById('pacote-saldo').innerText = pacote.qtd_restante; inputIdPacote.value = pacote.id_pacote; checkbox.checked = true; } }
+        async function salvarVendaPacote(e) { e.preventDefault(); const btn=document.getElementById('btn-salvar-pacote'); const originalText = btn.innerText; setLoading(btn, true, originalText); const f=e.target; if (itensPacoteTemp.length === 0) { mostrarAviso('Adicione serviços.'); setLoading(btn, false, originalText); return; } const cliente = clientesCache.find(c => c.nome === f.nome_cliente.value); if(!cliente) { mostrarAviso('Cliente inválido.'); setLoading(btn, false, originalText); return; } try { await fetch(API_URL, {method:'POST', body:JSON.stringify({ action:'createPacote', id_cliente: cliente.id_cliente, nome_cliente: cliente.nome, itens: itensPacoteTemp, valor_total: f.valor_total.value, validade: f.validade.value })}); fecharModal('modal-vender-pacote'); f.reset(); mostrarAviso('Pacote vendido!'); setTimeout(() => { carregarPacotes(); }, 1500); } catch(e) { mostrarAviso('Erro'); } finally { setLoading(btn, false, originalText); } }
+        function acaoFab() { if(abaAtiva==='servicos') abrirModalServico(); else if(abaAtiva==='agenda') abrirModalAgendamento(); else if(abaAtiva==='pacotes') abrirModalVenderPacote(); else mostrarAviso('Selecione uma aba válida.'); }
+        function switchTab(t, el) { abaAtiva = t; document.querySelectorAll('.nav-item').forEach(i=>i.classList.remove('active')); el.classList.add('active'); document.querySelectorAll('.tab-content').forEach(c=>c.classList.remove('active')); document.getElementById(`tab-${t}`).classList.add('active'); document.getElementById('main-fab').style.display = t==='config'?'none':'flex'; if (t === 'pacotes') carregarPacotes(); }
+        function mudarDia(d) { dataAtual.setDate(dataAtual.getDate()+d); atualizarPickerData(); carregarAgendamentosDoDia(); }
+        function atualizarPickerData() { document.getElementById('data-picker').value = dataAtual.toISOString().split('T')[0]; document.getElementById('dia-semana-display').innerText = dataAtual.toLocaleDateString('pt-PT', {weekday:'long', day:'numeric', month:'long'}); }
+        function renderizarColorPicker() { const c=document.getElementById('color-picker-container'); c.innerHTML=''; PALETA_CORES.forEach((cor,i)=>{const d=document.createElement('div');d.className=`color-option ${i===4?'selected':''}`;d.style.backgroundColor=cor;d.onclick=()=>{document.querySelectorAll('.color-option').forEach(el=>el.classList.remove('selected'));d.classList.add('selected');document.getElementById('input-cor-selecionada').value=cor};c.appendChild(d)})}
+        async function testarConexao() { try{const r=await fetch(`${API_URL}?action=testConnection`);const d=await r.json();if(d.status==='sucesso')document.getElementById('connection-status').className='w-2.5 h-2.5 rounded-full bg-green-500'}catch(e){document.getElementById('connection-status').className='w-2.5 h-2.5 rounded-full bg-red-500'}}
+        document.getElementById('data-picker').addEventListener('change', (e) => { const p=e.target.value.split('-'); dataAtual=new Date(p[0],p[1]-1,p[2]); atualizarPickerData(); carregarAgendamentosDoDia(); });
+        function formatarDataBr(dataStr) { if(!dataStr) return ''; if(dataStr.includes('T')) return new Date(dataStr).toLocaleDateString('pt-BR'); return dataStr.split('-').reverse().join('/'); }
+        function renderizarGrade() { const container = document.getElementById('agenda-timeline'); container.innerHTML = ''; if (!config.abertura || !config.fechamento) { container.innerHTML = '<p class="text-center text-red-400">Erro config horários.</p>'; return; } const [hAbre, mAbre] = config.abertura.split(':').map(Number); const [hFecha, mFecha] = config.fechamento.split(':').map(Number); const inicioDiaMin = hAbre * 60 + mAbre; const fimDiaMin = hFecha * 60 + mFecha; const intervalo = parseInt(config.intervalo_minutos) || 60; const alturaSlot = 80; const dataIso = dataAtual.toISOString().split('T')[0]; for (let min = inicioDiaMin; min < fimDiaMin; min += intervalo) { const horaSlot = Math.floor(min / 60); const minSlot = min % 60; const horaStr = `${String(horaSlot).padStart(2,'0')}:${String(minSlot).padStart(2,'0')}`; const slot = document.createElement('div'); slot.className = 'time-slot'; slot.style.height = `${alturaSlot}px`; slot.innerHTML = `<div class="time-label">${horaStr}</div><div class="slot-content" id="slot-${min}"><div class="slot-livre-area" onclick="abrirModalAgendamento('${horaStr}')"></div></div>`; container.appendChild(slot); } let eventosDia = agendamentosCache.filter(a => a.data_agendamento === dataIso && a.hora_inicio).map(a => { const [h, m] = a.hora_inicio.split(':').map(Number); const inicioMin = h * 60 + m; const servico = servicosCache.find(s => String(s.id_servico) === String(a.id_servico)); const duracao = servico ? parseInt(servico.duracao_minutos) : 60; return { ...a, inicioMin, fimMin: inicioMin + duracao, duracao, servico }; }).sort((a,b) => a.inicioMin - b.inicioMin); let grupos = []; let ultimoFimGrupo = -1; eventosDia.forEach(ev => { if (ev.inicioMin >= ultimoFimGrupo) { grupos.push([ev]); ultimoFimGrupo = ev.fimMin; } else { grupos[grupos.length - 1].push(ev); if(ev.fimMin > ultimoFimGrupo) ultimoFimGrupo = ev.fimMin; } }); grupos.forEach(grupo => { const largura = 100 / grupo.length; grupo.forEach((ev, index) => { if (ev.inicioMin < inicioDiaMin || ev.inicioMin >= fimDiaMin) return; const resto = (ev.inicioMin - inicioDiaMin) % intervalo; const slotBaseMin = ev.inicioMin - resto; const slotEl = document.getElementById(`slot-${slotBaseMin}`); if (!slotEl) return; const alturaCard = (ev.duracao / intervalo) * alturaSlot; const topOffset = (resto / intervalo) * alturaSlot; const leftPos = index * largura; const card = document.createElement('div'); card.className = 'event-card'; card.style.top = `${topOffset + 2}px`; card.style.height = `calc(${alturaCard}px - 4px)`; card.style.left = `calc(${leftPos}% + 2px)`; card.style.width = `calc(${largura}% - 4px)`; const corBase = getCorServico(ev.servico); card.style.backgroundColor = hexToRgba(corBase, 0.15); card.style.borderLeftColor = corBase; card.style.color = '#1e293b'; 
+        
+        // ICONE DE CONFIRMADO NO CARD
+        let statusHtml = ''; 
+        if (ev.status === 'Confirmado') { 
+            // Sem override de cor, apenas ícone
+            statusHtml = '<div class="absolute top-1 right-1 bg-green-500 text-white rounded-full w-4 h-4 flex items-center justify-center shadow-sm"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg></div>'; 
+            card.classList.add('status-confirmado'); // Apenas borda verde
+        } else if (ev.status === 'Concluido') { 
+            card.classList.add('status-concluido'); 
+        } else if (ev.status === 'Cancelado') { 
+            card.classList.add('status-cancelado'); 
+        } else { 
+            card.style.borderLeftColor = corBase; 
+        }
+
+        card.onclick = (e) => { e.stopPropagation(); abrirModalDetalhes(ev.id_agendamento); }; const nome = ev.nome_cliente || ev.observacoes || 'Cliente'; card.innerHTML = `${statusHtml}<div style="width: 90%" class="font-bold truncate text-[10px]">${nome}</div>${largura >= 25 ? `<div class="text-xs truncate">${ev.hora_inicio} • ${ev.servico ? ev.servico.nome_servico : 'Serviço'}</div>` : ''}`; slotEl.appendChild(card); }); }); }
+    </script>
+</body>
+</html>
